@@ -2,11 +2,11 @@ var redis = require('redis'),
     _     = require('underscore'),
     async = require('async');
 
-module.exports.Redlock = Redlock;
+module.exports = Redlock;
 
 function Redlock(serversOpts, id) {
   this.id = id || "id_not_set";
-  this.unlockSript = ' \
+  this.unlockScript = ' \
       if redis.call("get",KEYS[1]) == ARGV[1] then \
         return redis.call("del",KEYS[1]) \
       else \
@@ -17,15 +17,15 @@ function Redlock(serversOpts, id) {
   this.clients = _.map(serversOpts, function(serverOpts) {
     return redis.createClient(serverOpts.port, serverOpts.host);
   });
-  this.quorum = Math.ceil(serversOpts.length / 2);
+  this.quorum = Math.floor(serversOpts.length / 2) + 1;
   console.log("Quorum:",this.quorum);
 }
 
 Redlock.prototype._lockInstance = function(client, resource, value, ttl, callback) {
   client.set(resource, value, 'NX', 'PX', ttl, function(err, reply) {
-    if(err) {
-      console.log('Failed to lock instance: ' + err);
-      callback(err);
+    if(err || !reply) {
+      console.log('Failed to lock instance', err);
+      callback("" + err);
     }
     else
       callback();
@@ -33,7 +33,7 @@ Redlock.prototype._lockInstance = function(client, resource, value, ttl, callbac
 };
 
 Redlock.prototype._unlockInstance = function(client, resource, value) {
-  client.eval(this.unlockScript, 1, resource, value);
+  client.eval(this.unlockScript, 1, resource, value, function() {});
 };
 
 Redlock.prototype._getUniqueLockId = function(callback) {
@@ -68,8 +68,16 @@ Redlock.prototype.lock = function(resource, ttl, callback) {
           value: value
         });
       } else {
-        callback('Could not lock resource');
+        that.unlock(resource, value);
+        callback('Could not lock resource ' + resource);
       }
     }
   ], callback);
+};
+
+Redlock.prototype.unlock = function(resource, value) {
+  var that = this;
+  this.clients.forEach(function(client) {
+    that._unlockInstance(client, resource, value);
+  });
 };

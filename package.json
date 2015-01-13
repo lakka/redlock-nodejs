@@ -1,0 +1,10 @@
+{
+  "name": "Redlock",
+  "description": "Redlock for NodeJS",
+  "author": "Lauri Kangassalo",
+  "dependencies": {
+    "async": "*",
+    "redis": "*",
+    "underscore": "*"
+  }
+}
