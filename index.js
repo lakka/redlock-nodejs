@@ -43,6 +43,9 @@ Redlock.prototype._registerListeners = function() {
         that.emit('disconnect');
       }
     });
+    client.on('error', function() {
+      console.log('error connecting to a redis server');
+    });
   });
 };
 
