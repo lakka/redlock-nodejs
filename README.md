@@ -1,8 +1,8 @@
-# redlock-nodejs
+# redlock-nodejs [![Build Status](https://travis-ci.org/lakka/redlock-nodejs.svg?branch=master)](https://travis-ci.org/lakka/redlock-nodejs)
 A distributed lock algorithm for redis, see http://redis.io/topics/distlock
 
-## Install
+### Install
 `npm install`
 
-## Run tests
+### Run tests
 `npm test`
