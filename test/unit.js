@@ -82,6 +82,15 @@ describe('Redlock with three servers', function() {
     it('should call redis.createClient thrice', function() {
       expect(redisStub).to.have.been.calledThrice;
     });
+    it('should emit connect', function(done) {
+      redlock.on('connect', done);
+      clientStub.emit('connect');
+    });
+    it('should emit disconnect if all servers go down', function(done) {
+      redlock.on('disconnect', done);
+      clientStub.emit('connect');
+      clientStub.emit('end');
+    });
   });
 
   describe('#lock()', function() {
@@ -123,17 +132,4 @@ describe('Redlock with three servers', function() {
       expect(clientStub.eval).to.have.been.calledThrice;
     });
   });
-
-  describe('constructor', function() {
-    it('should emit connect', function(done) {
-      redlock.on('connect', done);
-      clientStub.emit('connect');
-    });
-    it('should emit disconnect if all servers go down', function(done) {
-      redlock.on('disconnect', done);
-      clientStub.emit('connect');
-      clientStub.emit('end');
-    });
-  });
-
 });
