@@ -3,7 +3,6 @@
 
 DIR=$HOME/redlock
 
-mkdir -p $DIR
-git clone /vagrant redlock
+git clone /vagrant $DIR
 
 cd $DIR
