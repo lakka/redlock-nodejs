@@ -32,3 +32,4 @@ testamundo*
 
 # Vim shit
 *.swp
+.vagrant
