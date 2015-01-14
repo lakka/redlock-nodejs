@@ -15,7 +15,7 @@ function Redlock(servers, id) {
       end \
   ';
   this.quorum = Math.floor(this.servers.length / 2) + 1;
-  console.log("Quorum is",this.quorum);
+  // console.log("Quorum is",this.quorum);
   this.clients = [];
   this._connectedClients = 0;
   this._connect();
@@ -44,7 +44,7 @@ Redlock.prototype._registerListeners = function() {
       }
     });
     client.on('error', function() {
-      console.log('error connecting to a redis server');
+      console.log('error with a redis server ^^\'');
     });
   });
 };
@@ -53,7 +53,7 @@ Redlock.prototype._lockInstance = function(client, resource, value, ttl, callbac
   client.set(resource, value, 'NX', 'PX', ttl, function(err, reply) {
     if(err || !reply) {
       err = err || 'resource locked';
-      console.log('Failed to lock instance:', err);
+      // console.log('Failed to lock instance:', err);
       callback("" + err);
     }
     else
@@ -88,8 +88,8 @@ Redlock.prototype.lock = function(resource, ttl, callback) {
     },
     function(callback) {
       var timeSpent = new Date().getTime() - startTime;
-      console.log('Time spent locking:', timeSpent, 'ms');
-      console.log(n + "", 'servers approve our lock');
+      // console.log('Time spent locking:', timeSpent, 'ms');
+      // console.log(n + "", 'servers approve our lock');
       var validityTime = ttl - timeSpent - that.drift;
       if(n >= that.quorum && validityTime > 0) {
         callback(null, {

@@ -1,10 +1,20 @@
 {
   "name": "Redlock",
-  "description": "Redlock for NodeJS",
+  "description": "Distributed lock algorithm for redis, see http://redis.io/topics/distlock",
   "author": "Lauri Kangassalo",
   "dependencies": {
     "async": "*",
+    "redis": "^0.8.3"
+  },
+  "devDependencies": {
+    "chai": "*",
+    "sinon": "*",
+    "sinon-chai": "*",
     "redis": "*",
-    "underscore": "*"
+    "async": "*",
+    "mocha": "*"
+  },
+  "scripts": {
+    "test": "mocha ./test"
   }
 }
