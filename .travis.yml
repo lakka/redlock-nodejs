@@ -2,3 +2,11 @@ language: node_js
 node_js:
   - "0.10"
   - "0.8"
+install:
+  - curl -sSL https://get.docker.com/ubuntu/ | sudo sh
+  - sudo docker build -t redis-1 virt/redis
+  - sudo docker build -t redis-2 virt/redis
+  - sudo docker build -t redis-3 virt/redis
+  - sudo docker run redis-1
+  - sudo docker run redis-2
+  - sudo docker run redis-3

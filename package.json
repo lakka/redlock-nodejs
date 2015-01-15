@@ -12,7 +12,8 @@
     "sinon-chai": "*",
     "redis": "*",
     "async": "*",
-    "mocha": "*"
+    "mocha": "*",
+    "dockerode": "*"
   },
   "scripts": {
     "test": "mocha ./test"
