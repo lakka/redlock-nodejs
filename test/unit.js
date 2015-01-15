@@ -6,7 +6,7 @@ var redis = require('redis');
 var async = require('async');
 var Redlock = require('../index');
 
-describe('Redlock with one server', function() {
+describe('(unit) Redlock with one server', function() {
   var sandbox = sinon.sandbox.create();
   var redisStub, redlock, clientStub, setSpy;
   beforeEach(function() {
@@ -16,7 +16,7 @@ describe('Redlock with one server', function() {
     clientStub.emit('connect');
     redisStub = sandbox.stub(redis, 'createClient');
     redisStub.returns(clientStub);
-    redlock = new Redlock([{host:'localhost', port:6739}]);
+    redlock = new Redlock([{host:'localhost', port:6739, lockRequestTimeout:500}]);
   });
 
   afterEach(function() {
@@ -61,9 +61,9 @@ describe('Redlock with one server', function() {
 describe('Redlock with three servers', function() {
   var sandbox = sinon.sandbox.create();
   var servers = [
-    {host:'localhost', port:6739},
-    {host:'jaakkomaa', port:6739},
-    {host:'localhost', port:6799}
+    {host:'localhost', port:6739, lockRequestTimeout: 500},
+    {host:'jaakkomaa', port:6739, lockRequestTimeout: 500},
+    {host:'localhost', port:6799, lockRequestTimeout: 500}
   ];
   var redisStub, redlock, clientStubError, clientStub, setSpy;
   beforeEach(function() {
