@@ -3,6 +3,8 @@
 
 DIR=$HOME/redlock
 
-cp -rf /vagrant $DIR
+if [ ! -e $DIR ]; then
+  git clone /vagrant $DIR
+fi
 
 cd $DIR

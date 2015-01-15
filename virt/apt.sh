@@ -18,6 +18,8 @@ echo deb http://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docke
 
 apt-get update
 
+apt-get remove --yes node
+
 apt-get install --yes --no-install-recommends \
   lxc-docker \
   git \

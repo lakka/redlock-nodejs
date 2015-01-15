@@ -15,8 +15,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   #
   config.vm.provision :shell, path: "virt/ttyfix.sh"
   config.vm.provision :shell, path: "virt/apt.sh"
-  config.vm.provision :shell, path: "virt/make.sh"
   config.vm.provision :shell, path: "virt/docker.sh"
+  config.vm.provision :shell, path: "virt/make.sh", :privileged => false
 
   ### Virtalbox configuration
   #
