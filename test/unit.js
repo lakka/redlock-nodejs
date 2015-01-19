@@ -13,7 +13,7 @@ describe('(unit) Redlock with one server', function() {
     clientStub = sandbox.stub(redis.createClient().on('error', function() {}));
     clientStub.set.onFirstCall().yields(null, 'OK');
     clientStub.set.onSecondCall().yields();
-    clientStub.emit('connect');
+    clientStub.emit('ready');
     redisStub = sandbox.stub(redis, 'createClient');
     redisStub.returns(clientStub);
     redlock = new Redlock([{host:'localhost', port:6739, lockRequestTimeout:500}]);
@@ -61,9 +61,9 @@ describe('(unit) Redlock with one server', function() {
 describe('Redlock with three servers', function() {
   var sandbox = sinon.sandbox.create();
   var servers = [
-    {host:'localhost', port:6739, lockRequestTimeout: 500},
-    {host:'jaakkomaa', port:6739, lockRequestTimeout: 500},
-    {host:'localhost', port:6799, lockRequestTimeout: 500}
+    {host:'localhost', port:6739},
+    {host:'jaakkomaa', port:6739},
+    {host:'localhost', port:6799}
   ];
   var redisStub, redlock, clientStubError, clientStub, setSpy;
   beforeEach(function() {
@@ -84,11 +84,11 @@ describe('Redlock with three servers', function() {
     });
     it('should emit connect', function(done) {
       redlock.on('connect', done);
-      clientStub.emit('connect');
+      clientStub.emit('ready');
     });
     it('should emit disconnect if all servers go down', function(done) {
       redlock.on('disconnect', done);
-      clientStub.emit('connect');
+      clientStub.emit('ready');
       clientStub.emit('end');
     });
   });
@@ -109,7 +109,7 @@ describe('Redlock with three servers', function() {
     });
     it('should err if one server approves lock, one errs and one disapproves', function() {
       clientStub.set.onFirstCall().yields(null, 'OK');
-      clientStub.set.onSecondCall().yields('ERROR');
+      clientStub.set.onSecondCall().yields(new Error('test error'));
       clientStub.set.onThirdCall().yields();
       redlock.lock('test', 1000, function(err) {
         expect(err).to.be.not.null;

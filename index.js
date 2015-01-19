@@ -17,6 +17,7 @@ function Redlock(servers, id) {
   this.quorum = Math.floor(this.servers.length / 2) + 1;
   // console.log("Quorum is",this.quorum);
   this.clients = [];
+  this.connected = false;
   this._connectedClients = 0;
   this._connect();
   this._registerListeners();
@@ -26,7 +27,7 @@ util.inherits(Redlock, events.EventEmitter);
 
 Redlock.prototype._connect = function() {
   this.clients = this.servers.map(function(server) {
-    var client = redis.createClient(server.port, server.host);
+    var client = redis.createClient(server.port, server.host, {enable_offline_queue:false});
     client.on('error', function() { });
     client.lockRequestTimeout = server.lockRequestTimeout || 100;
     return client;
@@ -36,13 +37,15 @@ Redlock.prototype._connect = function() {
 Redlock.prototype._registerListeners = function() {
   var that = this;
   this.clients.forEach(function(client) {
-    client.on('connect', function() {
+    client.on('ready', function() {
       if(++that._connectedClients === that.quorum) {
+        that.connected = true;
         that.emit('connect');
       }
     });
     client.on('end', function() {
       if(--that._connectedClients === (that.quorum - 1)) {
+        that.connected = false;
         that.emit('disconnect');
       }
     });
@@ -50,14 +53,7 @@ Redlock.prototype._registerListeners = function() {
 };
 
 Redlock.prototype._lockInstance = function(client, resource, value, ttl, callback) {
-  var done = false;
-  setTimeout(function() {
-    if(!done) {
-      callback(new Error('locking timed out'));
-    }
-  }, client.lockRequestTimeout);
   client.set(resource, value, 'NX', 'PX', ttl, function(err, reply) {
-    done = true;
     if(err || !reply) {
       err = err || new Error('resource locked');
       // console.log('Failed to lock instance:', err);
