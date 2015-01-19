@@ -16,7 +16,7 @@ describe('(unit) Redlock with one server', function() {
     clientStub.emit('ready');
     redisStub = sandbox.stub(redis, 'createClient');
     redisStub.returns(clientStub);
-    redlock = new Redlock([{host:'localhost', port:6739, lockRequestTimeout:500}]);
+    redlock = new Redlock([{host:'localhost', port:6739}]);
   });
 
   afterEach(function() {
@@ -46,6 +46,41 @@ describe('(unit) Redlock with one server', function() {
       redlock.lock('test', 1000, function(err, res) {
         expect(err).to.be.null;
         expect(res).to.be.an.object;
+      });
+    });
+    it('should retry on fail', function() {
+      clientStub.set.onFirstCall().yields();
+      clientStub.set.onSecondCall().yields(null, 'OK');
+      redlock.lock('test', 1000, function(err, res) {
+        expect(clientStub.set).to.have.been.calledTwice;
+      });
+    });
+    it('should try to lock three times if retries: 2 set', function() {
+      redlock = new Redlock([{host:'localhost', port:6739}],
+                            {retries:2});
+      clientStub.set.onFirstCall().yields();
+      clientStub.set.onSecondCall().yields();
+      clientStub.set.onThirdCall().yields(null, 'OK');
+      redlock.lock('test', 1000, function(err, res) {
+        expect(clientStub.set).to.have.been.calledThrice;
+      });
+    });
+  });
+
+  describe('#renew()', function() {
+    it('should call clientStub.eval once', function() {
+      redlock.lock('test', 1000, function(err, lock) {
+        if(err) return;
+        redlock.renew('test', lock.value, 100, function() {
+          expect(clientStub.eval).to.have.been.calledOnce;
+        });
+      });
+    });
+    it('should err if resource does not exist', function(done) {
+      clientStub.eval.onFirstCall().yields(null, 0);
+      redlock.renew('test', 'randomVal', 100, function(err) {
+        if(err) done();
+        else done(new Error('callback was not called with error'));
       });
     });
   });

@@ -10,10 +10,11 @@ var Docker  = require('dockerode'),
  */
 
 describe('(integration) Redlock with three redis-servers', function() {
-  var servers, containers, redlock;
+  var servers, containers, redlock, clients;
 
   beforeEach(function(done) {
     servers = [];
+    clients = [];
     containers = [];
     // Start redis-containers
     async.series([function(done) {
@@ -41,6 +42,7 @@ describe('(integration) Redlock with three redis-servers', function() {
               // Clear previous data
               var client = redis.createClient(server.port, server.host);
               client.on('error', function() {});
+              clients.push(client);
               client.flushall();
               next();
             });
@@ -64,11 +66,32 @@ describe('(integration) Redlock with three redis-servers', function() {
   });
 
   describe('#lock()', function() {
-    var random = Math.floor(Math.random() * 10) % 3;
     it('should acquire lock if all servers approve', function(done) {
       redlock.lock('test', 1000, done);
     });
+  });
+  describe('#renew()', function() {
+    it('should extend existing lock\'s ttl', function(done) {
+      redlock.lock('test', 200, function(err, lock) {
+        redlock.renew('test', lock.value, 1500, function(err, lock) {
+          setTimeout(function() {
+            clients[0].get('test', function(err, reply) {
+              if(!err && reply) {
+                done();
+              } else {
+                done(new Error('Lock was deleted before it was supposed to'));
+              }
+            });
+          }, 300);
+        });
+      });
+    });
+  });
+
+  describe('failover', function() {
+    var random = Math.floor(Math.random() * 10) % 3;
     it('should acquire lock if a server crashes', function(done) {
+      redlock.setRetry(0,0);
       containers[random].kill(function(err, data) {
         redlock.lock('test', 2000, function(err) {
           done(err);
@@ -76,6 +99,7 @@ describe('(integration) Redlock with three redis-servers', function() {
       });
     });
     it('should not acquire lock if res is locked and a server crashes', function(done) {
+      redlock.setRetry(0,0);
       redlock.lock('test', 2000, function() {
         containers[random].kill(function(err, data) {
           redlock.lock('test', 2000, function(err) {
@@ -84,6 +108,45 @@ describe('(integration) Redlock with three redis-servers', function() {
           });
         });
       });
+    });
+    it('servers A, B, C; C down -> lock acquired -> C up, B down -> lock released ' +
+       '-> B up, C down -> lock should be acquired', function(done) {
+      var value;
+      async.series([function(next) {
+        containers[2].kill(next);
+      }, function(next) {
+        redlock.lock('test', 2000, function(err, data) {
+          if(err) {
+            next(err);
+            return;
+          }
+          value = data.value;
+          next();
+        });
+      }, function(next) {
+        async.parallel([function(ready) {
+          containers[2].start(ready);
+        }, function(ready) {
+          containers[1].kill(ready);
+        }], next);
+      }, function(next) {
+        redlock.unlock('test', value);
+        next();
+      }, function(next) {
+        async.parallel([function(ready) {
+          containers[1].start(ready);
+        }, function(ready) {
+          containers[2].kill(ready);
+        }], next);
+      }, function(next) {
+        redlock.lock('test', 500, function(err) {
+          if(err) {
+            next(new Error('Last step failed, lock not acquired'));
+            return;
+          }
+          next();
+        });
+      }], done);
     });
   });
 

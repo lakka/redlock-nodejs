@@ -6,10 +6,19 @@ var redis  = require('redis'),
 function Redlock(servers, id) {
   this.servers = servers;
   this.id = id || "id_not_set";
+  this.retries = 3;
+  this.retryWait = 100;
   this.drift = 100;
   this.unlockScript = ' \
       if redis.call("get",KEYS[1]) == ARGV[1] then \
         return redis.call("del",KEYS[1]) \
+      else \
+        return 0 \
+      end \
+  ';
+  this.renewScript = ' \
+      if redis.call("get",KEYS[1]) == ARGV[1] then \
+        return redis.call("pexpire",KEYS[1],ARGV[2]) \
       else \
         return 0 \
       end \
@@ -25,11 +34,16 @@ function Redlock(servers, id) {
 
 util.inherits(Redlock, events.EventEmitter);
 
+Redlock.prototype.setRetry = function(retries, retryWait) {
+  this.retries = retries;
+  this.retryWait = retryWait;
+};
+
 Redlock.prototype._connect = function() {
   this.clients = this.servers.map(function(server) {
-    var client = redis.createClient(server.port, server.host, {enable_offline_queue:false});
+    var client = redis.createClient(server.port, server.host,
+                                    {enable_offline_queue:false});
     client.on('error', function() { });
-    client.lockRequestTimeout = server.lockRequestTimeout || 100;
     return client;
   });
 };
@@ -64,32 +78,44 @@ Redlock.prototype._lockInstance = function(client, resource, value, ttl, callbac
   });
 };
 
+Redlock.prototype._renewInstance = function(client, resource, value, ttl, callback) {
+  client.eval(this.renewScript, 1, resource, value, ttl, function(err, reply) {
+    if(err || !reply) {
+      err = err || new Error('resource does not exist');
+      // console.log('Failed to renew instance:', err);
+      callback(err);
+      return;
+    }
+    callback();
+  });
+};
+
 Redlock.prototype._unlockInstance = function(client, resource, value) {
   client.eval(this.unlockScript, 1, resource, value, function() {});
   // Unlocking is best-effort, so we don't care about errors
 };
 
+
 Redlock.prototype._getUniqueLockId = function(callback) {
   return this.id + "." + new Date().getTime();
 };
 
-Redlock.prototype.lock = function(resource, ttl, callback) {
+Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, callback) {
   var that = this;
-  var value = this._getUniqueLockId();
   var n = 0;
   var startTime = new Date().getTime();
 
-  async.waterfall([
+  async.series([
     function(locksSet) {
       async.each(that.clients, function(client, done) {
-        that._lockInstance(client, resource, value, ttl, function(err) {
+        lockFunction.apply(that, [client, resource, value, ttl, function(err) {
           if(!err)
             n++;
           done();
-        });
+        }]);
       }, locksSet);
     },
-    function(callback) {
+    function() {
       var timeSpent = new Date().getTime() - startTime;
       // console.log('Time spent locking:', timeSpent, 'ms');
       // console.log(n + "", 'servers approve our lock');
@@ -105,7 +131,33 @@ Redlock.prototype.lock = function(resource, ttl, callback) {
         callback(new Error('Could not lock resource ' + resource));
       }
     }
-  ], callback);
+  ]);
+};
+
+Redlock.prototype.lock = function(resource, ttl, callback) {
+  var that = this;
+  var retries = this.retries;
+  var value = this._getUniqueLockId();
+  var myCallback = function(err, lock) {
+    if(err) {
+      if(retries > 0) {
+        retries--;
+        var timeout = Math.floor(Math.random() * this.retryWait);
+        setTimeout(
+          that._acquireLock.bind(that, resource, value, ttl, that._lockInstance, myCallback),
+          timeout);
+      } else {
+        callback(err);
+      }
+      return;
+    }
+    callback(null, lock);
+  };
+  this._acquireLock(resource, value, ttl, this._lockInstance, myCallback);
+};
+
+Redlock.prototype.renew = function(resource, value, ttl, callback) {
+  this._acquireLock(resource, value, ttl, this._renewInstance, callback);
 };
 
 Redlock.prototype.unlock = function(resource, value) {
