@@ -1,6 +1,6 @@
 {
   "name": "multiredlock",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A distributed lock algorithm for redis, see http://redis.io/topics/distlock",
   "author": "Lauri Kangassalo <lauri.kangassalo@helsinki.fi>",
   "homepage": "https://github.com/lakka/redlock-nodejs",
