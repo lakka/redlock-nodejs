@@ -99,13 +99,14 @@ Redlock.prototype._unlockInstance = function(client, resource, value) {
 
 
 Redlock.prototype._getUniqueLockId = function(callback) {
-  return this.id + "." + new Date().getTime();
+  return this.id + "." + Date.now() + "." +  Math.random().toString(16).slice(2);
 };
 
 Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, callback) {
   var that = this;
+  var value = value || this._getUniqueLockId();
   var n = 0;
-  var startTime = new Date().getTime();
+  var startTime = Date.now();
 
   async.series([
     function(locksSet) {
@@ -139,14 +140,13 @@ Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, ca
 Redlock.prototype.lock = function(resource, ttl, callback) {
   var that = this;
   var retries = this.retries;
-  var value = this._getUniqueLockId();
-  var myCallback = function(err, lock) {
+  var retryCallback = function(err, lock) {
     if(err) {
       if(retries > 0) {
         retries--;
         var timeout = Math.floor(Math.random() * this.retryWait);
         setTimeout(
-          that._acquireLock.bind(that, resource, value, ttl, that._lockInstance, myCallback),
+          that._acquireLock.bind(that, resource, null, ttl, that._lockInstance, retryCallback),
           timeout);
       } else {
         callback(err);
@@ -155,7 +155,7 @@ Redlock.prototype.lock = function(resource, ttl, callback) {
     }
     callback(null, lock);
   };
-  this._acquireLock(resource, value, ttl, this._lockInstance, myCallback);
+  this._acquireLock(resource, null, ttl, this._lockInstance, retryCallback);
 };
 
 Redlock.prototype.renew = function(resource, value, ttl, callback) {
