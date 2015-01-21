@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "description": "A distributed lock algorithm for redis, see http://redis.io/topics/distlock",
   "author": "Lauri Kangassalo <lauri.kangassalo@helsinki.fi>",
+  "homepage": "https://github.com/lakka/redlock-nodejs",
+  "license": "MIT",
+  "keywords": [
+    "redis",
+    "distributed lock manager"
+  ],
   "repository": {
     "type": "git",
     "url": "git://github.com/lakka/redlock-nodejs.git"
