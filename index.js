@@ -1,11 +1,13 @@
 var redis  = require('redis'),
     events = require('events'),
     util   = require('util'),
-    async  = require('async');
+    async  = require('async'),
+    os     = require('os');
 
-function Redlock(servers, id) {
-  this.servers = servers;
-  this.id = id || "id_not_set";
+function Redlock(servers, options) {
+  options = options || {};
+  this.servers = servers || [{host: 'localhost', port: 6379}];
+  this.id = options.id || os.hostname();
   this.retries = 3;
   this.retryWait = 100;
   this.drift = 100;
