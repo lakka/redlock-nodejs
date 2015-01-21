@@ -5,9 +5,9 @@ var redis  = require('redis'),
     os     = require('os');
 
 function Redlock(servers, options) {
-  options = options || {};
+  this.options = options || {};
   this.servers = servers || [{host: 'localhost', port: 6379}];
-  this.id = options.id || os.hostname();
+  this.id = this.options.id || os.hostname();
   this.retries = 3;
   this.retryWait = 100;
   this.drift = 100;
@@ -26,13 +26,17 @@ function Redlock(servers, options) {
       end \
   ';
   this.quorum = Math.floor(this.servers.length / 2) + 1;
-  // console.log("Quorum is",this.quorum);
   this.clients = [];
   this.connected = false;
   this._connectedClients = 0;
   this._connect();
   this._registerListeners();
+  if(this.options.debug) {
+    console.log("Initialized with quorum",this.quorum,
+                ", total servers", servers.length);
+  }
 }
+
 
 util.inherits(Redlock, events.EventEmitter);
 
@@ -42,10 +46,12 @@ Redlock.prototype.setRetry = function(retries, retryWait) {
 };
 
 Redlock.prototype._connect = function() {
+  var onError = (this.options.debug) ? console.log : function() {};
   this.clients = this.servers.map(function(server) {
-    var client = redis.createClient(server.port, server.host,
+    var port = server.port || 6379;
+    var client = redis.createClient(port, server.host,
                                     {enable_offline_queue:false});
-    client.on('error', function() { });
+    client.on('error', onError);
     return client;
   });
 };
@@ -69,10 +75,13 @@ Redlock.prototype._registerListeners = function() {
 };
 
 Redlock.prototype._lockInstance = function(client, resource, value, ttl, callback) {
+  var that = this;
   client.set(resource, value, 'NX', 'PX', ttl, function(err, reply) {
     if(err || !reply) {
       err = err || new Error('resource locked');
-      // console.log('Failed to lock instance:', err);
+      if(that.options.debug) {
+        console.log('Failed to lock instance:', err);
+      }
       callback(err);
     }
     else
@@ -81,10 +90,13 @@ Redlock.prototype._lockInstance = function(client, resource, value, ttl, callbac
 };
 
 Redlock.prototype._renewInstance = function(client, resource, value, ttl, callback) {
+  var that = this;
   client.eval(this.renewScript, 1, resource, value, ttl, function(err, reply) {
     if(err || !reply) {
       err = err || new Error('resource does not exist');
-      // console.log('Failed to renew instance:', err);
+      if(that.options.debug) {
+       console.log('Failed to renew instance:', err);
+      }
       callback(err);
       return;
     }
@@ -99,7 +111,7 @@ Redlock.prototype._unlockInstance = function(client, resource, value) {
 
 
 Redlock.prototype._getUniqueLockId = function(callback) {
-  return this.id + "." + Date.now() + "." +  Math.random().toString(16).slice(2);
+  return this.id + "_" + Date.now() + "_" +  Math.random().toString(16).slice(2);
 };
 
 Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, callback) {
@@ -119,9 +131,11 @@ Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, ca
       }, locksSet);
     },
     function() {
-      var timeSpent = new Date().getTime() - startTime;
-      // console.log('Time spent locking:', timeSpent, 'ms');
-      // console.log(n + "", 'servers approve our lock');
+      var timeSpent = Date.now() - startTime;
+      if(that.options.debug) {
+        console.log('Time spent locking:', timeSpent, 'ms');
+        console.log(n + "", 'servers approve our lock');
+      }
       var validityTime = ttl - timeSpent - that.drift;
       if(n >= that.quorum && validityTime > 0) {
         callback(null, {

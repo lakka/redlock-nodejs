@@ -32,4 +32,8 @@ testamundo*
 
 # Vim shit
 *.swp
+*.swo
+
+# Other shit
 .vagrant
+*.rdb
