@@ -57,8 +57,9 @@ The constructor takes two arguments, an array `servers` and an object `options`:
 One may omit the `port`-property from the server object. Multiredlock will then will assume port number `6379`.
 
 The object `options` may have the following properties:
-- `id`: an optional ID to give for this instance of multiredlock. Is used in identifying locks. Defaults to the machine's hostname.
-- `debug`: run multiredlock in debug mode.
+- `id`: an optional ID string to give for this instance of multiredlock. Is used in identifying locks. Defaults to the machine's hostname.
+- `drift`: set the maximum clock drift between servers in milliseconds. This will be subtracted from lock validity time. The default is 100ms.
+- `debug`: run multiredlock in debug mode. Boolean.
 
 ### setRetry(retries, retryWait)
 Sets the amount of retries and the maximum time to wait between retries when acquiring a lock. The actual time to retry will be chosen randomly between 0 and `retryWait` milliseconds before each retry. The default is 3 retries with 100ms maximum wait. This means that multiredlock will try to acquire a lock a total of 4 times before giving up. Setting `retries` to 0 will disable retrying.
