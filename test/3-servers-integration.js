@@ -84,10 +84,11 @@ describe('(integration) Redlock with three redis-servers', function() {
     it.only('servers A, B, C; C down -> lock acquired -> C up, B down -> lock released ' +
        '-> B up, C down -> lock should be acquired', function(done) {
       var value;
+      this.timeout(5000);
       async.series([function(next) {
         containers[2].kill(next);
       }, function(next) {
-        redlock.lock('test', 2000, function(err, data) {
+        redlock.lock('test', 5000, function(err, data) {
           if(err) {
             next(err);
             return;
@@ -110,7 +111,7 @@ describe('(integration) Redlock with three redis-servers', function() {
           clients[1].once('ready', ready);
           containers[1].start(function() { });
         }, function(ready) {
-          containers[2].kill(ready);
+          containers[2].stop(ready); // Stop the container so lock gets saved
         }], next);
       }, function(next) {
         redlock.lock('test', 500, function(err) {

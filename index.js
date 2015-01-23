@@ -74,7 +74,6 @@ Redlock.prototype._registerListeners = function() {
         that.connected = true;
         that.emit('connect');
       }
-      console.log('connected!');
       that._dequeueUnlocks(client);
     });
     client.on('end', function() {
@@ -128,7 +127,6 @@ Redlock.prototype._unlockInstance = function(client, resource, value) {
 
 Redlock.prototype._enqueueUnlock = function(queueId, resource, value) {
   this.clients.forEach(function(client) {
-    console.log(queueId);
     client.rpush(queueId, JSON.stringify({
       resource: resource,
       value:value
@@ -151,7 +149,9 @@ Redlock.prototype._dequeueUnlocks = function(fromClient) {
     if(clientsWithQueue.length == 0) {
       return;
     }
-    console.log('Got',clientsWithQueue.length,'servers with queue');
+    if(that.options.debug) {
+      console.log('Got',clientsWithQueue.length,'servers with unlock queue for this client');
+    }
     var client = clientsWithQueue[0];
     client.llen(queueId, function(err, length) {
       if(err || (length == 0)) {

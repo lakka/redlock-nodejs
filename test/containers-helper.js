@@ -28,7 +28,6 @@ exports.startRedisServers = function(n, callback) {
           var host = containerInfo.NetworkSettings.IPAddress;
           try {
             port = containerInfo.NetworkSettings.Ports['6379/tcp'][0].HostPort;
-            console.log(port);
             host = 'localhost';
           } catch(e) { }
           var server = {
