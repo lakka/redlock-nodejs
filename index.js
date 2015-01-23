@@ -5,12 +5,19 @@ var redis  = require('redis'),
     os     = require('os');
 
 function Redlock(servers, options) {
+  if(servers && !Array.isArray(servers)) {
+    if(servers.host) {
+      servers = [servers];
+    } else if(!options) {
+      options = servers;
+    }
+  }
   this.options = options || {};
   this.servers = servers || [{host: 'localhost', port: 6379}];
   this.id = this.options.id || os.hostname();
   this.retries = 3;
   this.retryWait = 100;
-  this.drift = 100;
+  this.drift = this.options.drift || 100;
   this.unlockScript = ' \
       if redis.call("get",KEYS[1]) == ARGV[1] then \
         return redis.call("del",KEYS[1]) \
