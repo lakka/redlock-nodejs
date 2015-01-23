@@ -54,12 +54,14 @@ Redlock.prototype.setRetry = function(retries, retryWait) {
 };
 
 Redlock.prototype._connect = function() {
+  var that = this;
   var onError = (this.options.debug) ? console.log : function() {};
   this.clients = this.servers.map(function(server) {
     var port = server.port || 6379;
     var client = redis.createClient(port, server.host,
                                     {enable_offline_queue:false});
     client.on('error', onError);
+    client.redlockUniqueId = that._getUniqueId();
     return client;
   });
 };
@@ -72,6 +74,8 @@ Redlock.prototype._registerListeners = function() {
         that.connected = true;
         that.emit('connect');
       }
+      console.log('connected!');
+      that._dequeueUnlocks(client);
     });
     client.on('end', function() {
       if(--that._connectedClients === (that.quorum - 1)) {
@@ -113,18 +117,73 @@ Redlock.prototype._renewInstance = function(client, resource, value, ttl, callba
 };
 
 Redlock.prototype._unlockInstance = function(client, resource, value) {
-  client.eval(this.unlockScript, 1, resource, value, function() {});
-  // Unlocking is best-effort, so we don't care about errors
+  var that = this;
+  client.eval(this.unlockScript, 1, resource, value, function(err, reply) {
+    if(that.options.disableQueue) return;
+    if(err) {
+      that._enqueueUnlock(client.redlockUniqueId, resource, value);
+    }
+  });
+};
+
+Redlock.prototype._enqueueUnlock = function(queueId, resource, value) {
+  this.clients.forEach(function(client) {
+    console.log(queueId);
+    client.rpush(queueId, JSON.stringify({
+      resource: resource,
+      value:value
+    }), function() {});
+  });
+};
+
+Redlock.prototype._dequeueUnlocks = function(fromClient) {
+  var that = this;
+  var clientsWithQueue = [];
+  var queueId = fromClient.redlockUniqueId;
+  async.each(this.clients, function(client, next) {
+    client.exists(queueId, function(err, reply) {
+      if(!err && reply) {
+        clientsWithQueue.push(client);
+      }
+      next();
+    });
+  }, function() {
+    if(clientsWithQueue.length == 0) {
+      return;
+    }
+    console.log('Got',clientsWithQueue.length,'servers with queue');
+    var client = clientsWithQueue[0];
+    client.llen(queueId, function(err, length) {
+      if(err || (length == 0)) {
+        return;
+      }
+      client.lrange(queueId, 0, length, function(err, reply) {
+        if(err || !reply) {
+          return;
+        }
+        reply.forEach(function(lockStr) {
+          var locks;
+          try {
+            lock = JSON.parse(lockStr);
+          } catch (e) { }
+          that._unlockInstance(fromClient, lock.resource, lock.value);
+        });
+        clientsWithQueue.forEach(function(client) {
+          client.del(queueId, function() { });
+        });
+      });
+    });
+  });
 };
 
 
-Redlock.prototype._getUniqueLockId = function(callback) {
+Redlock.prototype._getUniqueId = function(callback) {
   return this.id + "_" + Date.now() + "_" +  Math.random().toString(16).slice(2);
 };
 
 Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, callback) {
   var that = this;
-  var value = value || this._getUniqueLockId();
+  var value = value || this._getUniqueId();
   var n = 0;
   var startTime = Date.now();
 

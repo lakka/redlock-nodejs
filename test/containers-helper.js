@@ -16,7 +16,7 @@ exports.startRedisServers = function(n, callback) {
         next('Could not find container ' + containerName + '. Abort.');
         return;
       }
-      containers.push(container);
+      containers[n] = container;
       container.start(function(err, data) {
         if(err && err.statusCode != 304) {
           next(err);
@@ -24,16 +24,23 @@ exports.startRedisServers = function(n, callback) {
         container.unpause(function() { });
         container.inspect(function(err, containerInfo) {
           if(err) next(err);
+          var port = 6379;
+          var host = containerInfo.NetworkSettings.IPAddress;
+          try {
+            port = containerInfo.NetworkSettings.Ports['6379/tcp'][0].HostPort;
+            console.log(port);
+            host = 'localhost';
+          } catch(e) { }
           var server = {
-            host: containerInfo.NetworkSettings.IPAddress,
-            port: 6379
+            host: host,
+            port: port
           };
-          servers.push(server);
+          servers[n] = server;
 
           // Clear previous data
           var client = redis.createClient(server.port, server.host);
           client.on('error', function() {});
-          clients.push(client);
+          clients[n] = client;
           client.flushall(next);
         });
       });

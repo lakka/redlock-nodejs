@@ -81,7 +81,7 @@ describe('(integration) Redlock with three redis-servers', function() {
         });
       });
     });
-    it('servers A, B, C; C down -> lock acquired -> C up, B down -> lock released ' +
+    it.only('servers A, B, C; C down -> lock acquired -> C up, B down -> lock released ' +
        '-> B up, C down -> lock should be acquired', function(done) {
       var value;
       async.series([function(next) {
@@ -97,7 +97,8 @@ describe('(integration) Redlock with three redis-servers', function() {
         });
       }, function(next) {
         async.parallel([function(ready) {
-          containers[2].start(ready);
+          clients[2].once('ready', ready);
+          containers[2].start(function() { });
         }, function(ready) {
           containers[1].kill(ready);
         }], next);
@@ -106,7 +107,8 @@ describe('(integration) Redlock with three redis-servers', function() {
         next();
       }, function(next) {
         async.parallel([function(ready) {
-          containers[1].start(ready);
+          clients[1].once('ready', ready);
+          containers[1].start(function() { });
         }, function(ready) {
           containers[2].kill(ready);
         }], next);
