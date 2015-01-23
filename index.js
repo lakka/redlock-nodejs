@@ -10,6 +10,7 @@ function Redlock(servers, options) {
       servers = [servers];
     } else if(!options) {
       options = servers;
+      servers = null;
     }
   }
   this.options = options || {};
