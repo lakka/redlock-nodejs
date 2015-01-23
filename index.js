@@ -158,7 +158,10 @@ Redlock.prototype.lock = function(resource, ttl, callback) {
     if(err) {
       if(retries > 0) {
         retries--;
-        var timeout = Math.floor(Math.random() * this.retryWait);
+        var timeout = Math.floor(Math.random() * that.retryWait);
+        if(that.options.debug) {
+          console.log('Retrying locking in', timeout, 'ms');
+        }
         setTimeout(
           that._acquireLock.bind(that, resource, null, ttl, that._lockInstance, retryCallback),
           timeout);
