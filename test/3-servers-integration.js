@@ -43,8 +43,7 @@ describe('(integration) Redlock with three redis-servers', function() {
               var client = redis.createClient(server.port, server.host);
               client.on('error', function() {});
               clients.push(client);
-              client.flushall();
-              next();
+              client.flushall(next);
             });
           });
         }, done);
