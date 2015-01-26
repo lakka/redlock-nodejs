@@ -27,9 +27,9 @@ describe('(integration) Redlock with three redis-servers', function() {
           containers = cont;
           next();
         });
-    }, function(done) {
+    }, function(next) {
       redlock = new Redlock(servers);
-      redlock.on('connect', done);
+      redlock.once('connect', next);
     }], done);
   });
 
@@ -81,7 +81,7 @@ describe('(integration) Redlock with three redis-servers', function() {
         });
       });
     });
-    it.only('servers A, B, C; C down -> lock acquired -> C up, B down -> lock released ' +
+    it('servers A, B, C; C down -> lock acquired -> C up, B down -> lock released ' +
        '-> B up, C down -> lock should be acquired', function(done) {
       var value;
       this.timeout(5000);

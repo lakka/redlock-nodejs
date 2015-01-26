@@ -10,7 +10,7 @@ var Docker  = require('dockerode'),
  * redis-1
  */
 
-describe('(integration) Redlock with five redis-servers', function() {
+describe('(integration) Redlock with one redis-server', function() {
   var servers, containers, redlock, clients;
 
   beforeEach(function(done) {
@@ -28,7 +28,7 @@ describe('(integration) Redlock with five redis-servers', function() {
         });
     }, function(done) {
       redlock = new Redlock(servers);
-      redlock.on('connect', done);
+      redlock.once('connect', done);
     }], done);
   });
 

@@ -28,7 +28,7 @@ describe('(integration) Redlock with five redis-servers', function() {
         });
     }, function(done) {
       redlock = new Redlock(servers);
-      redlock.on('connect', done);
+      redlock.once('connect', done);
     }], done);
   });
 

@@ -19,6 +19,12 @@ function Redlock(servers, options) {
   this.retries = 3;
   this.retryWait = 100;
   this.drift = this.options.drift || 100;
+  this.serverIdScript = '' +
+      'if redis.call("exists",KEYS[1]) == 1 then' +
+      '  return redis.call("get",KEYS[1])' +
+      'else' +
+      '  return redis.call("set",KEYS[1],ARGV[1],"NX")' +
+      'end';
   this.unlockScript = ' \
       if redis.call("get",KEYS[1]) == ARGV[1] then \
         return redis.call("del",KEYS[1]) \
@@ -61,7 +67,6 @@ Redlock.prototype._connect = function() {
     var client = redis.createClient(port, server.host,
                                     {enable_offline_queue:false});
     client.on('error', onError);
-    client.redlockUniqueId = that._getUniqueId();
     return client;
   });
 };
@@ -74,7 +79,14 @@ Redlock.prototype._registerListeners = function() {
         that.connected = true;
         that.emit('connect');
       }
-      that._dequeueUnlocks(client);
+      if(!client.redlockServerId) {
+        that._getServerId(client, function(id) {
+          client.redlockServerId = id;
+          that._dequeueUnlocks(client);
+        });
+      } else {
+        that._dequeueUnlocks(client);
+      }
     });
     client.on('end', function() {
       if(--that._connectedClients === (that.quorum - 1)) {
@@ -118,14 +130,37 @@ Redlock.prototype._renewInstance = function(client, resource, value, ttl, callba
 Redlock.prototype._unlockInstance = function(client, resource, value) {
   var that = this;
   client.eval(this.unlockScript, 1, resource, value, function(err, reply) {
-    if(that.options.disableQueue) return;
+    if(that.options.disableUnlockQueue) return;
     if(err) {
       that._enqueueUnlock(client.redlockUniqueId, resource, value);
     }
   });
 };
 
+Redlock.prototype._getServerId = function(client, callback) {
+  var that = this;
+  var key = "redlockServerId";
+  var id = this._getUniqueServerId();
+  client.eval(this.serverIdScript, 1, key, id, function(err, reply) {
+    if(err || !reply) {
+      console.log(reply);
+      err = err || new Error('server id key existed unexpectedly');
+      console.warn('Could not set id for a client! Unlocks not queued for this client',
+                   err);
+      callback(client);
+      return;
+    }
+    if(that.options.debug) {
+      console.log('Got server id', reply);
+    }
+    callback(reply);
+  });
+  
+
+};
+
 Redlock.prototype._enqueueUnlock = function(queueId, resource, value) {
+  if(!queueId) return;
   this.clients.forEach(function(client) {
     client.rpush(queueId, JSON.stringify({
       resource: resource,
@@ -137,7 +172,8 @@ Redlock.prototype._enqueueUnlock = function(queueId, resource, value) {
 Redlock.prototype._dequeueUnlocks = function(fromClient) {
   var that = this;
   var clientsWithQueue = [];
-  var queueId = fromClient.redlockUniqueId;
+  var queueId = fromClient.redlockServerId;
+  if(!queueId) return;
   async.each(this.clients, function(client, next) {
     client.exists(queueId, function(err, reply) {
       if(!err && reply) {
@@ -177,13 +213,17 @@ Redlock.prototype._dequeueUnlocks = function(fromClient) {
 };
 
 
-Redlock.prototype._getUniqueId = function(callback) {
+Redlock.prototype._getUniqueLockId = function(callback) {
   return this.id + "_" + Date.now() + "_" +  Math.random().toString(16).slice(2);
+};
+
+Redlock.prototype._getUniqueServerId = function(callback) {
+  return Date.now() + "_" +  Math.random().toString(16).slice(2);
 };
 
 Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, callback) {
   var that = this;
-  var value = value || this._getUniqueId();
+  var value = value || this._getUniqueLockId();
   var n = 0;
   var startTime = Date.now();
 
