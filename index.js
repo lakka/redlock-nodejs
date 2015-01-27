@@ -49,7 +49,6 @@ function Redlock(servers, options) {
   }
 }
 
-
 util.inherits(Redlock, events.EventEmitter);
 
 Redlock.prototype.setRetry = function(retries, retryWait) {
@@ -65,14 +64,8 @@ Redlock.prototype._connect = function() {
     var client = redis.createClient(port, server.host,
                                     {enable_offline_queue:false});
     client.on('error', onError);
-    that._pollQueuesPeriodically(client);
     return client;
   });
-};
-
-Redlock.prototype._pollQueuesPeriodically = function(forClient) {
-  this._pollQueues(forClient);
-  setTimeout(this._pollQueuesPeriodically.bind(this, forClient), 5000);
 };
 
 Redlock.prototype._pollQueues = function(forClient) {
@@ -99,6 +92,7 @@ Redlock.prototype._registerListeners = function() {
         that.emit('connect');
       }
       that._pollQueues(client);
+      setInterval(that._pollQueues, 5000, client);
     });
     client.on('end', function() {
       if(--that._connectedClients === (that.quorum - 1)) {
@@ -167,8 +161,6 @@ Redlock.prototype._getServerId = function(client, callback) {
     }
     callback(reply);
   });
-  
-
 };
 
 Redlock.prototype._enqueueUnlock = function(queueId, resource, value) {
