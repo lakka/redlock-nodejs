@@ -9,8 +9,13 @@ var EventEmitter = require('events').EventEmitter
 
 describe('(unit) Redlock with three servers', function() {
   var sandbox = sinon.sandbox.create();
-  var redisStub, redlock, clientStubs, setSpy;
+  var redisStub, redlock, clientStubs, servers;
   beforeEach(function() {
+    servers = [
+      {host:'jaakkomaa', port:2922},
+      {host:'jakkomaa', port:3922},
+      {host:'jaakomaa', port:2922}
+    ];
     var count = 3;
     clientStubs = [];
     for(var i = 0; i < count; i++) {
@@ -22,7 +27,7 @@ describe('(unit) Redlock with three servers', function() {
     for(var i = 0; i < count; i++) {
       redisStub.onCall(i).returns(clientStubs[i]);
     }
-    redlock = new Redlock([{host:'localhost', port:6739}]);
+    redlock = new Redlock(servers);
   });
 
   afterEach(function() {
@@ -37,12 +42,28 @@ describe('(unit) Redlock with three servers', function() {
       clientStubs[1].emit('ready');
     });
     it('should emit disconnect when connection count falls to 1', function(done) {
+      this.timeout(500);
       redlock.on('disconnect', done);;
       clientStubs.forEach(function (clientStub) {
         clientStub.emit('ready');
       });
       clientStubs[0].emit('end');
       clientStubs[1].emit('end');
+    });
+  });
+
+  describe('constructor', function() {
+    it('should call redis.createClient thrice', function() {
+      expect(redisStub).to.have.been.calledThrice;
+    });
+  });
+  describe('lock()', function() {
+    it('should call set for each client', function() {
+      redlock.lock('test', 500, function() {
+        clientStubs.forEach(function (clientStub) {
+          expect(clientStub.set).to.have.been.calledOnce;
+        });
+      });
     });
   });
 });
