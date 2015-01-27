@@ -92,12 +92,16 @@ Redlock.prototype._registerListeners = function() {
         that.emit('connect');
       }
       that._pollQueues(client);
-      setInterval(that._pollQueues, 5000, client);
+      var interval = setInterval(that._pollQueues.bind(that, client), 5000);
+      client.redlockPollInterval = interval;
     });
     client.on('end', function() {
       if(--that._connectedClients === (that.quorum - 1)) {
         that.connected = false;
         that.emit('disconnect');
+      }
+      if(client.redlockPollInterval) {
+        clearInterval(client.redlockPollInterval);
       }
     });
   });
