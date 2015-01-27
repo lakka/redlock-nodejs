@@ -35,13 +35,13 @@ describe('(unit) Redlock with three servers', function() {
   });
 
   describe('events', function() {
-    it('should emit connect when 2 servers are ready', function(done) {
+    it('should emit connect when two servers are ready', function(done) {
       this.timeout(500);
       redlock.on('connect', done);;
       clientStubs[0].emit('ready');
       clientStubs[1].emit('ready');
     });
-    it('should emit disconnect when connection count falls to 1', function(done) {
+    it('should emit disconnect when connection count falls below two', function(done) {
       this.timeout(500);
       redlock.on('disconnect', done);;
       clientStubs.forEach(function (clientStub) {
@@ -62,6 +62,27 @@ describe('(unit) Redlock with three servers', function() {
       redlock.lock('test', 500, function() {
         clientStubs.forEach(function (clientStub) {
           expect(clientStub.set).to.have.been.calledOnce;
+        });
+      });
+    });
+  });
+  describe('unlock()', function() {
+    it('should call eval for each client', function() {
+      redlock.lock('test', 500, function(err, val) {
+        redlock.unlock(val.resource, val.value);
+        clientStubs.forEach(function (clientStub) {
+          expect(clientStub.eval).to.have.been.calledOnce;
+        });
+      });
+    });
+  });
+  describe('renew()', function() {
+    it('should call eval for each client', function() {
+      redlock.lock('test', 500, function(err, val) {
+        redlock.renew(val.resource, val.value, 1000, function() {
+          clientStubs.forEach(function (clientStub) {
+            expect(clientStub.eval).to.have.been.calledOnce;
+          });
         });
       });
     });

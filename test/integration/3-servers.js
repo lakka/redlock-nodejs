@@ -60,7 +60,7 @@ describe('(integration) Redlock with three redis-servers', function() {
     });
   });
 
-  describe('failover', function() {
+  describe('failover, servers denoted with A, B and C', function() {
     var random = Math.floor(Math.random() * 10) % 3;
     it('should acquire lock if a server crashes', function(done) {
       redlock.setRetry(0,0);
@@ -81,7 +81,47 @@ describe('(integration) Redlock with three redis-servers', function() {
         });
       });
     });
-    it('servers A, B, C; C down -> lock acquired -> C up, B down -> lock released ' +
+    it('acquire lock -> A, B down -> lock released -> ' +
+       'A, B up -> lock should be acquired', function(done) {
+      this.timeout(5000);
+      var value;
+      async.series([function(next) {
+        redlock.lock('test', 5000, function(err, lock) {
+          if(err) {
+            done(new Error('First step failed' + err));
+            return;
+          }
+          value = lock.value;
+          next();
+        });
+      }, function(next) {
+        async.parallel([function(next) {
+          containers[1].kill(next);
+        }, function(next) {
+          containers[2].kill(next);
+        }], next);
+      }, function(next) {
+        redlock.unlock('test', value);
+        next();
+      }, function(next) {
+        async.parallel([function(next) {
+          containers[1].start(next);
+        }, function(next) {
+          containers[2].start(next);
+        }], function() {
+          redlock.once('connect', next);
+        });
+      }, function(next) {
+        redlock.lock('test', 500, function(err, lock) {
+          if(err) {
+            done(new Error('Final step failed' + err));
+            return;
+          }
+          next();
+        });
+       }], done);
+    });
+    it('C down -> lock acquired -> C up, B down -> lock released ' +
        '-> B up, C down -> lock should be acquired', function(done) {
       var value;
       this.timeout(5000);
