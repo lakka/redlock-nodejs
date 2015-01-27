@@ -25,20 +25,18 @@ function Redlock(servers, options) {
       'else' +
       '  return redis.call("set",KEYS[1],ARGV[1],"NX")' +
       'end';
-  this.unlockScript = ' \
-      if redis.call("get",KEYS[1]) == ARGV[1] then \
-        return redis.call("del",KEYS[1]) \
-      else \
-        return 0 \
-      end \
-  ';
-  this.renewScript = ' \
-      if redis.call("get",KEYS[1]) == ARGV[1] then \
-        return redis.call("pexpire",KEYS[1],ARGV[2]) \
-      else \
-        return 0 \
-      end \
-  ';
+  this.unlockScript = '' +
+      'if redis.call("get",KEYS[1]) == ARGV[1] then ' +
+      '  return redis.call("del",KEYS[1]) ' +
+      'else ' +
+      '  return 0 ' +
+      'end ';
+  this.renewScript = '' +
+      'if redis.call("get",KEYS[1]) == ARGV[1] then ' +
+      '  return redis.call("pexpire",KEYS[1],ARGV[2]) ' +
+      'else ' +
+      '  return 0 ' +
+      'end ';
   this.quorum = Math.floor(this.servers.length / 2) + 1;
   this.clients = [];
   this.connected = false;
@@ -67,8 +65,29 @@ Redlock.prototype._connect = function() {
     var client = redis.createClient(port, server.host,
                                     {enable_offline_queue:false});
     client.on('error', onError);
+    that._pollQueuesPeriodically(client);
     return client;
   });
+};
+
+Redlock.prototype._pollQueuesPeriodically = function(forClient) {
+  this._pollQueues(forClient);
+  setTimeout(this._pollQueuesPeriodically.bind(this, forClient), 5000);
+};
+
+Redlock.prototype._pollQueues = function(forClient) {
+  var that = this;
+  if(!forClient.connected) {
+    return;
+  }
+  if(!forClient.redlockServerId) {
+    this._getServerId(forClient, function(id) {
+      forClient.redlockServerId = id;
+      that._dequeueUnlocks(forClient);
+    });
+  } else {
+    this._dequeueUnlocks(forClient);
+  }
 };
 
 Redlock.prototype._registerListeners = function() {
@@ -79,14 +98,7 @@ Redlock.prototype._registerListeners = function() {
         that.connected = true;
         that.emit('connect');
       }
-      if(!client.redlockServerId) {
-        that._getServerId(client, function(id) {
-          client.redlockServerId = id;
-          that._dequeueUnlocks(client);
-        });
-      } else {
-        that._dequeueUnlocks(client);
-      }
+      that._pollQueues(client);
     });
     client.on('end', function() {
       if(--that._connectedClients === (that.quorum - 1)) {
@@ -186,7 +198,7 @@ Redlock.prototype._dequeueUnlocks = function(fromClient) {
       return;
     }
     if(that.options.debug) {
-      console.log('Got',clientsWithQueue.length,'servers with unlock queue for this client');
+      console.log('Got',clientsWithQueue.length,'servers with unlock queue for',queueId);
     }
     var client = clientsWithQueue[0];
     client.llen(queueId, function(err, length) {
@@ -211,7 +223,6 @@ Redlock.prototype._dequeueUnlocks = function(fromClient) {
     });
   });
 };
-
 
 Redlock.prototype._getUniqueLockId = function(callback) {
   return this.id + "_" + Date.now() + "_" +  Math.random().toString(16).slice(2);

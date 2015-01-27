@@ -3,7 +3,7 @@ var Docker  = require('dockerode'),
     async   = require('async'),
     redis   = require('redis'),
     dockerhelper = require('./containers-helper'),
-    Redlock = require('../index');
+    Redlock = require('../../index');
 
 /*
  * This test requires a redis-server docker container named:
