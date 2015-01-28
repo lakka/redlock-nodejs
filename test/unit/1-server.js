@@ -36,7 +36,7 @@ describe('(unit) Redlock with one server', function() {
     });
   });
 
-  describe('#lock()', function() {
+  describe('lock()', function() {
     it('should call redisClient.set once', function() {
       redlock.lock('test', 1000, function() {
         expect(clientStub.set).to.have.been.calledOnce;
@@ -74,7 +74,7 @@ describe('(unit) Redlock with one server', function() {
     });
   });
 
-  describe('#renew()', function() {
+  describe('renew()', function() {
     it('should call clientStub.eval once', function() {
       redlock.lock('test', 1000, function(err, lock) {
         if(err) return;
@@ -92,7 +92,7 @@ describe('(unit) Redlock with one server', function() {
     });
   });
   
-  describe('#unlock()', function() {
+  describe('unlock()', function() {
     it('should call redisClient.eval once', function() {
       redlock.unlock('test', 'value', function() {});
       expect(clientStub.eval).to.have.been.calledOnce;

@@ -87,4 +87,12 @@ describe('(unit) Redlock with three servers', function() {
       });
     });
   });
+  describe('disconnect()', function() {
+    it('should call quit() for all clients', function() {
+      redlock.disconnect();
+      clientStubs.forEach(function (clientStub) {
+        expect(clientStub.quit).to.have.been.calledOnce;
+      });
+    });
+  });
 });

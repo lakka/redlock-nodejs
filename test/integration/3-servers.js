@@ -37,12 +37,12 @@ describe('(integration) Redlock with three redis-servers', function() {
     dockerhelper.stopEverything(done);
   });
 
-  describe('#lock()', function() {
+  describe('lock()', function() {
     it('should acquire lock if all servers approve', function(done) {
       redlock.lock('test', 1000, done);
     });
   });
-  describe('#renew()', function() {
+  describe('renew()', function() {
     it('should extend existing lock\'s ttl', function(done) {
       redlock.lock('test', 200, function(err, lock) {
         redlock.renew('test', lock.value, 1500, function(err, lock) {
@@ -81,7 +81,7 @@ describe('(integration) Redlock with three redis-servers', function() {
         });
       });
     });
-    it('acquire lock -> A, B down -> lock released -> ' +
+    it.only('acquire lock -> A, B down -> lock released -> ' +
        'A, B up -> lock should be acquired', function(done) {
       this.timeout(5000);
       var value;
@@ -96,9 +96,9 @@ describe('(integration) Redlock with three redis-servers', function() {
         });
       }, function(next) {
         async.parallel([function(next) {
-          containers[1].kill(next);
+          containers[1].stop(next);
         }, function(next) {
-          containers[2].kill(next);
+          containers[2].stop(next);
         }], next);
       }, function(next) {
         redlock.unlock('test', value);
