@@ -61,53 +61,58 @@ Redlock.prototype._connect = function() {
   var onError = (this.options.debug) ? console.log : function() {};
   this.clients = this.servers.map(function(server) {
     var port = server.port || 6379;
-    var client = redis.createClient(port, server.host,
+    var conn = redis.createClient(port, server.host,
                                     {enable_offline_queue:false});
-    client.on('error', onError);
+    conn.on('error', onError);
+    var client = {
+      conn: conn,
+      id: null,
+      pollInterval: null
+    };
     return client;
   });
 };
 
 Redlock.prototype.disconnect = function() {
   this.clients.forEach(function(client) {
-    client.unref();
+    client.conn.unref();
   });
 };
 
 Redlock.prototype._pollQueues = function(forClient) {
   var that = this;
-  if(!forClient.connected) {
+  if(!forClient.conn.connected) {
     return;
   }
-  if(!forClient.redlockServerId) {
+  if(!forClient.id) {
     this._getServerId(forClient, function(id) {
-      forClient.redlockServerId = id;
-      that._dequeueUnlocks(forClient);
+      forClient.id = id;
+      that._dequeue(forClient);
     });
   } else {
-    this._dequeueUnlocks(forClient);
+    this._dequeue(forClient);
   }
 };
 
 Redlock.prototype._registerListeners = function() {
   var that = this;
   this.clients.forEach(function(client) {
-    client.on('ready', function() {
+    client.conn.on('ready', function() {
       if(++that._connectedClients === that.quorum) {
         that.connected = true;
         that.emit('connect');
       }
       that._pollQueues(client);
       var interval = setInterval(that._pollQueues.bind(that, client), 5000);
-      client.redlockPollInterval = interval;
+      client.pollInterval = interval;
     });
-    client.on('end', function() {
+    client.conn.on('end', function() {
       if(--that._connectedClients === (that.quorum - 1)) {
         that.connected = false;
         that.emit('disconnect');
       }
-      if(client.redlockPollInterval) {
-        clearInterval(client.redlockPollInterval);
+      if(client.pollInterval) {
+        clearInterval(client.pollInterval);
       }
     });
   });
@@ -115,7 +120,7 @@ Redlock.prototype._registerListeners = function() {
 
 Redlock.prototype._lockInstance = function(client, resource, value, ttl, callback) {
   var that = this;
-  client.set(resource, value, 'NX', 'PX', ttl, function(err, reply) {
+  client.conn.set(resource, value, 'NX', 'PX', ttl, function(err, reply) {
     if(err || !reply) {
       err = err || new Error('resource locked');
       if(that.options.debug) {
@@ -130,7 +135,7 @@ Redlock.prototype._lockInstance = function(client, resource, value, ttl, callbac
 
 Redlock.prototype._renewInstance = function(client, resource, value, ttl, callback) {
   var that = this;
-  client.eval(this.renewScript, 1, resource, value, ttl, function(err, reply) {
+  client.conn.eval(this.renewScript, 1, resource, value, ttl, function(err, reply) {
     if(err || !reply) {
       err = err || new Error('resource does not exist');
       if(that.options.debug) {
@@ -145,19 +150,19 @@ Redlock.prototype._renewInstance = function(client, resource, value, ttl, callba
 
 Redlock.prototype._unlockInstance = function(client, resource, value) {
   var that = this;
-  client.eval(this.unlockScript, 1, resource, value, function(err, reply) {
-    if(that.options.disableUnlockQueue) return;
+  client.conn.eval(this.unlockScript, 1, resource, value, function(err, reply) {
+    if(that.options.disableQueues) return;
     if(err) {
-      that._enqueueUnlock(client.redlockUniqueId, resource, value);
+      that._enqueue(client.id, resource, value);
     }
   });
 };
 
 Redlock.prototype._getServerId = function(client, callback) {
   var that = this;
-  var key = "redlockServerId";
+  var key = "multiredlockServerId";
   var id = this._getUniqueServerId();
-  client.eval(this.serverIdScript, 1, key, id, function(err, reply) {
+  client.conn.eval(this.serverIdScript, 1, key, id, function(err, reply) {
     if(err || !reply) {
       console.log(reply);
       err = err || new Error('server id key existed unexpectedly');
@@ -173,23 +178,23 @@ Redlock.prototype._getServerId = function(client, callback) {
   });
 };
 
-Redlock.prototype._enqueueUnlock = function(queueId, resource, value) {
+Redlock.prototype._enqueue = function(queueId, resource, value) {
   if(!queueId) return;
   this.clients.forEach(function(client) {
-    client.rpush(queueId, JSON.stringify({
+    client.conn.rpush(queueId, JSON.stringify({
       resource: resource,
       value:value
     }), function() {});
   });
 };
 
-Redlock.prototype._dequeueUnlocks = function(fromClient) {
+Redlock.prototype._dequeue = function(forClient) {
   var that = this;
   var clientsWithQueue = [];
-  var queueId = fromClient.redlockServerId;
+  var queueId = forClient.id;
   if(!queueId) return;
   async.each(this.clients, function(client, next) {
-    client.exists(queueId, function(err, reply) {
+    client.conn.exists(queueId, function(err, reply) {
       if(!err && reply) {
         clientsWithQueue.push(client);
       }
@@ -203,11 +208,11 @@ Redlock.prototype._dequeueUnlocks = function(fromClient) {
       console.log('Got',clientsWithQueue.length,'servers with unlock queue for',queueId);
     }
     var client = clientsWithQueue[0];
-    client.llen(queueId, function(err, length) {
+    client.conn.llen(queueId, function(err, length) {
       if(err || (length == 0)) {
         return;
       }
-      client.lrange(queueId, 0, length, function(err, reply) {
+      client.conn.lrange(queueId, 0, length, function(err, reply) {
         if(err || !reply) {
           return;
         }
@@ -216,10 +221,10 @@ Redlock.prototype._dequeueUnlocks = function(fromClient) {
           try {
             lock = JSON.parse(lockStr);
           } catch (e) { }
-          that._unlockInstance(fromClient, lock.resource, lock.value);
+          that._unlockInstance(forClient, lock.resource, lock.value);
         });
         clientsWithQueue.forEach(function(client) {
-          client.del(queueId, function() { });
+          client.conn.del(queueId, function() { });
         });
       });
     });
@@ -243,11 +248,11 @@ Redlock.prototype._acquireLock = function(resource, value, ttl, lockFunction, ca
   async.series([
     function(locksSet) {
       async.each(that.clients, function(client, done) {
-        lockFunction.apply(that, [client, resource, value, ttl, function(err) {
+        lockFunction.call(that, client, resource, value, ttl, function(err) {
           if(!err)
             n++;
           done();
-        }]);
+        });
       }, locksSet);
     },
     function() {
