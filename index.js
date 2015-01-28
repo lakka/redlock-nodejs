@@ -41,7 +41,7 @@ function Redlock(servers, options) {
   this.clients = [];
   this.connected = false;
   this._connectedClients = 0;
-  this.connect();
+  this._connect();
   this._registerListeners();
   if(this.options.debug) {
     console.log("Initialized with quorum",this.quorum,
@@ -56,7 +56,7 @@ Redlock.prototype.setRetry = function(retries, retryWait) {
   this.retryWait = retryWait;
 };
 
-Redlock.prototype.connect = function() {
+Redlock.prototype._connect = function() {
   var that = this;
   var onError = (this.options.debug) ? console.log : function() {};
   this.clients = this.servers.map(function(server) {
@@ -70,7 +70,7 @@ Redlock.prototype.connect = function() {
 
 Redlock.prototype.disconnect = function() {
   this.clients.forEach(function(client) {
-    client.quit();
+    client.unref();
   });
 };
 
