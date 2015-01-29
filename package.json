@@ -6,6 +6,10 @@
   "homepage": "https://github.com/lakka/redlock-nodejs",
   "license": "MIT",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "lib"
+  ],
   "keywords": [
     "redis",
     "distributed lock manager"
