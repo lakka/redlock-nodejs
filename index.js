@@ -38,7 +38,7 @@ function Redlock(servers, options) {
   this._connectedClients = 0;
   this._connect();
   this._registerListeners();
-  this.queues = new Queues(this.clients, this.options);
+  this.queues = new Queues(this, this.clients, this.options);
   if(this.options.debug) {
     console.log("Initialized with quorum",this.quorum,
                 ", total servers", servers.length);
@@ -126,6 +126,9 @@ Redlock.prototype._renewInstance = function(client, resource, value, ttl, callba
       if(that.options.debug) {
        console.log('Failed to renew instance:', err);
       }
+      if(that.options.disableQueues) {
+        that.queues._enqueue(client, Queues.renew, resource, value);
+      }
       callback(err);
       return;
     }
@@ -138,7 +141,7 @@ Redlock.prototype._unlockInstance = function(client, resource, value) {
   client.conn.eval(this.unlockScript, 1, resource, value, function(err, reply) {
     if(that.options.disableQueues) return;
     if(err) {
-      that.queues._enqueue(client.id, resource, value);
+      that.queues._enqueue(client, Queues.unlock, resource, value);
     }
   });
 };
