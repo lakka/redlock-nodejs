@@ -12,7 +12,7 @@ Simple example, which can be found in `example.js`:
 ```js
     var Redlock = require('multiredlock');
     
-    var redlock = new Redlock([{host:'localhost', port:6379}])
+    var redlock = new Redlock([{host:'localhost', port:6379}]);
     
     redlock.on('connect', function() { 
       // Let's lock resource 'console' for 10 seconds!
@@ -123,3 +123,6 @@ You also must have VirtualBox and Vagrant installed.
     redlock:~$ npm test
 
 If you wish to run only unit tests, you can do so by issuing `mocha test/unit.js` in the project root.
+
+----
+Special thanks to [amv](https://github.com/amv) for sharing his thoughts on this project, and ordinary thanks to [virta](https://github.com/virta).
