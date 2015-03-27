@@ -167,4 +167,11 @@ describe('Redlock with three servers', function() {
       expect(clientStub.eval).to.have.been.calledThrice;
     });
   });
+
+  describe('#close()', function() {
+    it('should call redisClient.quit thrice', function() {
+      redlock.close();
+      expect(clientStub.quit).to.have.been.calledThrice;
+    });
+  });
 });

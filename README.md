@@ -107,6 +107,12 @@ Unlocks a resource.
 
 Notice: unlock does not provide a callback, for unlocking attempts are best-effort, and there is no guarantee that the resource will be unlocked.
 
+### close()
+Disconnect from all redis-servers.
+
+This maybe useful for releasing the event loop for letting your program exit.
+Note that this effectively makes this multiredlock instance unusable.
+
 ## Tests
 This project has integration and failover tests implemented with Vagrant and Docker.
 The tests simulate a production environment where redis servers may crash.

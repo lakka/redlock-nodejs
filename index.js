@@ -194,4 +194,10 @@ Redlock.prototype.unlock = function(resource, value) {
   });
 };
 
+Redlock.prototype.close = function() {
+  this.clients.forEach(function(client) {
+    client.quit();
+  });
+};
+
 module.exports = Redlock;
