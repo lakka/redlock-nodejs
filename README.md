@@ -56,6 +56,8 @@ The constructor takes two arguments, an array `servers` and an object `options`:
 
 One may omit the `port`-property from the server object. Multiredlock will then will assume port number `6379`.
 
+An optional auth value may be passed in the server object to connect to a password protected Redis instance. e.g. `auth: 'foobared'` will connect with the password `foobarded`/
+
 The object `options` may have the following properties:
 - `id`: an optional ID string to give for this instance of multiredlock. Is used in identifying locks. Defaults to the machine's hostname.
 - `drift`: set the maximum clock drift between servers in milliseconds. This will be subtracted from lock validity time. The default is 100ms.
