@@ -34,7 +34,30 @@ exports.startRedisServers = function(n, callback) {
           var client = redis.createClient(server.port, server.host);
           client.on('error', function() {});
           clients.push(client);
-          client.flushall(next);
+
+          // Retry flushall to Redis for a total of about 4 seconds
+          // with timeouts of 16 ms, 32 ms, 64 ms .. 2048 ms
+          var retryCount = 0;
+          var flushallRetryHandler = function(err) {
+            if (err) {
+              retryCount++;
+              if (retryCount > 8 ) {
+                next(new Error('Unable to find started redis N=' + n + '. Last error: ' + err ));
+              }
+              else {
+                setTimeout(
+                    function() {
+                      client.flushall(flushallRetryHandler);
+                    },
+                    Math.pow(2, retryCount+3)
+                );
+              }
+            }
+            else {
+              next();
+            }
+          };
+          client.flushall(flushallRetryHandler);
         });
       });
     }, function(err) {
