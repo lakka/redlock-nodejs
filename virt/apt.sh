@@ -23,7 +23,7 @@ apt-get remove --yes node
 apt-get install --yes --no-install-recommends \
   lxc-docker \
   git \
-  nodejs \
+  nodejs-legacy \
   npm \
   redis-server \
   redis-tools
