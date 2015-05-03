@@ -59,6 +59,9 @@ Redlock.prototype._connect = function() {
     var port = server.port || 6379;
     var client = redis.createClient(port, server.host,
                                     {enable_offline_queue:false});
+    if (typeof server.auth !== 'undefined') {
+      client.auth(server.auth);
+    }
     client.on('error', onError);
     return client;
   });
