@@ -52,11 +52,11 @@ Note: you must have redis-server running on localhost at port 6379.
 ### Constructor
 The constructor takes two arguments, an array `servers` and an object `options`:
 - new Redlock() = new Redlock([{host:'localhost', port:6379}]);
-- new Redlock([{host:'192.168.0.100', port:6380}, {host:'example.com', port:6379}, {host:'localhost', port:6381}], options); will connect to three redis-servers residing at `192.168.0.100`, `example.com` and `localhost`.
+- new Redlock([{host:'192.168.0.100', port:6380}, {host:'example.com', port:6379}, {host:'localhost', port:6381, auth:'foobarded'}], options); will connect to three redis-servers residing at `192.168.0.100`, `example.com` and `localhost`.
 
 One may omit the `port`-property from the server object. Multiredlock will then will assume port number `6379`.
 
-An optional auth value may be passed in the server object to connect to a password protected Redis instance. e.g. `auth: 'foobared'` will connect with the password `foobarded`/
+An optional auth value may be passed in the server object to connect to a password protected Redis instance. e.g. `auth: 'foobared'` will connect with the password `foobarded`
 
 The object `options` may have the following properties:
 - `id`: an optional ID string to give for this instance of multiredlock. Is used in identifying locks. Defaults to the machine's hostname.
