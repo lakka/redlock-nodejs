@@ -183,6 +183,57 @@ describe('(integration) Redlock with three redis-servers', function() {
         });
        }], done);
     });
+    it('C down -> lock acquired -> C up, B down -> lock is renewed ' +
+       '-> B up, C down -> wait first lock expire -> lock should not be acquirable yet', function(done) {
+      var value;
+      var first_lock_time;
+      async.series([function(next) {
+        containers[2].stop(next);
+      }, function(next) {
+        redlock.lock('test', 1000, function(err, data) {
+          if(err) {
+            return next(err);
+          }
+          value = data.value;
+          first_lock_time = new Date().getTime();
+          next();
+        });
+      }, function(next) {
+        async.parallel([function(ready) {
+          clients[2].once('ready', ready);
+          containers[2].start(function() { });
+        }, function(ready) {
+          containers[1].stop(ready);
+        }], next);
+      }, function(next) {
+        redlock.renew('test', value, 5000, function(err, data) {
+          if (err) {
+            return next(err);
+          }
+          next();
+        });
+      }, function(next) {
+        async.parallel([function(ready) {
+          clients[1].once('ready', ready);
+          containers[1].start(ready);
+        }, function(ready) {
+          containers[2].stop(ready);
+        }], next);
+      }, function(next) {
+        var timeout_left = 1000 - new Date().getTime() - first_lock_time + 10;
+        if ( timeout_left < 0 ) {
+          timeout_left = 0;
+        }
+        setTimeout( function() {
+          redlock.lock('test', 500, function(err) {
+            if(err) {
+              return next();
+            }
+            next(new Error('Lock acquired although it was not supposed to!'))
+          });
+        }, timeout_left );
+      }], done);
+    } ),
     it('C down -> lock acquired -> C up, B down -> lock released ' +
        '-> B up, C down -> lock should be acquired', function(done) {
       var value;
