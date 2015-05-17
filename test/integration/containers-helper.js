@@ -16,7 +16,7 @@ exports.startRedisServers = function(n, callback) {
         next('Could not find container ' + containerName + '. Abort.');
         return;
       }
-      containers.push(container);
+      containers[n] = container;
       container.start(function(err, data) {
         if(err && err.statusCode != 304) {
           next(err);
@@ -24,40 +24,23 @@ exports.startRedisServers = function(n, callback) {
         container.unpause(function() { });
         container.inspect(function(err, containerInfo) {
           if(err) next(err);
+          var port = 6379;
+          var host = containerInfo.NetworkSettings.IPAddress;
+          try {
+            port = containerInfo.NetworkSettings.Ports['6379/tcp'][0].HostPort;
+            host = 'localhost';
+          } catch(e) { }
           var server = {
-            host: containerInfo.NetworkSettings.IPAddress,
-            port: 6379
+            host: host,
+            port: port
           };
-          servers.push(server);
+          servers[n] = server;
 
           // Clear previous data
           var client = redis.createClient(server.port, server.host);
           client.on('error', function() {});
-          clients.push(client);
-
-          // Retry flushall to Redis for a total of about 4 seconds
-          // with timeouts of 16 ms, 32 ms, 64 ms .. 2048 ms
-          var retryCount = 0;
-          var flushallRetryHandler = function(err) {
-            if (err) {
-              retryCount++;
-              if (retryCount > 8 ) {
-                next(new Error('Unable to find started redis N=' + n + '. Last error: ' + err ));
-              }
-              else {
-                setTimeout(
-                    function() {
-                      client.flushall(flushallRetryHandler);
-                    },
-                    Math.pow(2, retryCount+3)
-                );
-              }
-            }
-            else {
-              next();
-            }
-          };
-          client.flushall(flushallRetryHandler);
+          clients[n] = client;
+          client.flushall(next);
         });
       });
     }, function(err) {

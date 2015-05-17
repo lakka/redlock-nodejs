@@ -3,7 +3,7 @@ var Docker  = require('dockerode'),
     async   = require('async'),
     redis   = require('redis'),
     dockerhelper = require('./containers-helper'),
-    Redlock = require('../index');
+    Redlock = require('../../index');
 
 /*
  * This test requires five redis-server docker containers named:
@@ -28,7 +28,7 @@ describe('(integration) Redlock with five redis-servers', function() {
         });
     }, function(done) {
       redlock = new Redlock(servers);
-      redlock.on('connect', done);
+      redlock.once('connect', done);
     }], done);
   });
 

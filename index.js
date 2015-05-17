@@ -203,4 +203,11 @@ Redlock.prototype.close = function() {
   });
 };
 
+// For test use only
+Redlock.prototype.disconnect = function() {
+  this.clients.forEach(function(client) {
+    client.unref();
+  });
+};
+
 module.exports = Redlock;
