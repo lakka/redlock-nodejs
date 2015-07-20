@@ -27,6 +27,9 @@ function Redlock(servers, options) {
       end \
   ';
   this.renewScript = ' \
+      if not redis.call("exists",KEYS[1]) then \
+        redis.call("psetex",KEYS[1],ARGV[2],ARGV[1]) \
+      end \
       if redis.call("get",KEYS[1]) == ARGV[1] then \
         return redis.call("pexpire",KEYS[1],ARGV[2]) \
       else \
@@ -200,6 +203,13 @@ Redlock.prototype.unlock = function(resource, value) {
 Redlock.prototype.close = function() {
   this.clients.forEach(function(client) {
     client.quit();
+  });
+};
+
+// For test use only
+Redlock.prototype.disconnect = function() {
+  this.clients.forEach(function(client) {
+    client.unref();
   });
 };
 
